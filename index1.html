@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RCL Scout Group - Base de Datos</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        
+        header { text-align: center; margin-bottom: 40px; }
+        h1 { color: #0e2b4b; margin: 0; }
+        p { color: #666; }
+
+        /* Tarjetas de Menú */
+        .menu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .menu-card { 
+            background: white; padding: 30px; border-radius: 10px; text-align: center; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; text-decoration: none; color: inherit; border-top: 5px solid #0e2b4b;
+        }
+        .menu-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        .icon { font-size: 40px; margin-bottom: 10px; display: block; }
+        .card-title { font-weight: bold; font-size: 1.2em; color: #0e2b4b; display: block; }
+
+        /* Lista de Informes */
+        .db-section { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h2 { color: #0e2b4b; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        
+        .report-list { list-style: none; padding: 0; }
+        .report-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 15px; border-bottom: 1px solid #eee; 
+        }
+        .report-item:last-child { border-bottom: none; }
+        .badge { padding: 5px 10px; border-radius: 4px; font-size: 0.8em; font-weight: bold; color: white; }
+        .bg-ind { background: #28a745; }
+        .bg-team { background: #007bff; }
+        .bg-ana { background: #6f42c1; }
+        
+        .refresh-btn { float: right; background: #0e2b4b; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>RCL SCOUT DATABASE</h1>
+        <p>Panel de Control y Gestión de Informes</p>
+    </header>
+
+    <div class="menu-grid">
+        <a href="individual.html" class="menu-card">
+            <span class="icon">👤</span>
+            <span class="card-title">Nuevo Informe Individual</span>
+            <span style="font-size:0.9em; color:#666;">Scouting de Jugador</span>
+        </a>
+        <a href="equipo.html" class="menu-card">
+            <span class="icon">🛡️</span>
+            <span class="card-title">Nuevo Informe Equipo</span>
+            <span style="font-size:0.9em; color:#666;">Pre-partido / Rival</span>
+        </a>
+        <a href="analista.html" class="menu-card">
+            <span class="icon">📊</span>
+            <span class="card-title">Nuevo Informe Analista</span>
+            <span style="font-size:0.9em; color:#666;">Análisis Táctico Profundo</span>
+        </a>
+    </div>
+
+    <div class="db-section">
+        <button class="refresh-btn" onclick="cargarInformes()">🔄 Actualizar Lista</button>
+        <h2>Informes Recientes en la Nube</h2>
+        <ul id="listaInformes" class="report-list">
+            <li style="text-align:center; color:#999; padding:20px;">Cargando datos de la base de datos...</li>
+        </ul>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDNqcD6XHJemD3lVSaJy98xADsqYSmfVSk",
+        authDomain: "rcl-scout-group-database.firebaseapp.com",
+        projectId: "rcl-scout-group-database",
+        storageBucket: "rcl-scout-group-database.firebasestorage.app",
+        messagingSenderId: "194052020832",
+        appId: "1:194052020832:web:3de5ace09a814e98710105",
+        measurementId: "G-M1P8P02CJT"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    function cargarInformes() {
+        const lista = document.getElementById('listaInformes');
+        lista.innerHTML = "";
+        
+        let todosLosInformes = [];
+
+        // Promesas para leer las 3 colecciones
+        const p1 = db.collection("informes_individuales").orderBy("fecha_registro", "desc").limit(5).get().then(s => s.docs.map(d => ({...d.data(), tipo: 'Individual', id: d.id})));
+        const p2 = db.collection("informes_equipos").orderBy("fecha_registro", "desc").limit(5).get().then(s => s.docs.map(d => ({...d.data(), tipo: 'Equipo', id: d.id})));
+        const p3 = db.collection("informes_analista").orderBy("fecha_registro", "desc").limit(5).get().then(s => s.docs.map(d => ({...d.data(), tipo: 'Analista', id: d.id})));
+
+        Promise.all([p1, p2, p3]).then(results => {
+            // Unir y ordenar por fecha (más reciente primero)
+            todosLosInformes = [...results[0], ...results[1], ...results[2]];
+            todosLosInformes.sort((a, b) => (b.fecha_registro?.seconds || 0) - (a.fecha_registro?.seconds || 0));
+
+            if(todosLosInformes.length === 0) {
+                lista.innerHTML = "<li style='padding:20px; text-align:center'>No hay informes guardados aún.</li>";
+                return;
+            }
+
+            todosLosInformes.forEach(info => {
+                let titulo = "Desconocido";
+                let detalle = "";
+                let claseBadge = "bg-ind";
+
+                // Formatear fecha
+                let fecha = "Sin fecha";
+                if(info.fecha_registro) {
+                    fecha = new Date(info.fecha_registro.seconds * 1000).toLocaleDateString();
+                }
+
+                if(info.tipo === 'Individual') {
+                    titulo = info.nombre || "Jugador";
+                    detalle = `Scout: ${info.scout_name || 'N/A'} | Club: ${info.club}`;
+                    claseBadge = "bg-ind";
+                } else if (info.tipo === 'Equipo') {
+                    titulo = `${info.local} vs ${info.visitante}`;
+                    detalle = `Competición: ${info.competicion} | Res: ${info.resultado}`;
+                    claseBadge = "bg-team";
+                } else {
+                    titulo = `${info.local} vs ${info.visitante}`;
+                    detalle = `Análisis Táctico | Scout: ${info.scout_name}`;
+                    claseBadge = "bg-ana";
+                }
+
+                lista.innerHTML += `
+                    <li class="report-item">
+                        <div>
+                            <strong style="font-size:1.1em; color:#333;">${titulo}</strong><br>
+                            <span style="font-size:0.85em; color:#666;">${detalle}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <span class="badge ${claseBadge}">${info.tipo}</span><br>
+                            <span style="font-size:0.75em; color:#999;">${fecha}</span>
+                        </div>
+                    </li>
+                `;
+            });
+        }).catch(error => {
+            console.error(error);
+            lista.innerHTML = "<li style='color:red; padding:20px;'>Error cargando base de datos. Verifica tu conexión o permisos.</li>";
+        });
+    }
+
+    // Cargar al inicio
+    cargarInformes();
+</script>
+
+</body>
+</html>
